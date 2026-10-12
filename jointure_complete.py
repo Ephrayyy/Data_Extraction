@@ -10,15 +10,37 @@ Colonnes gardées :
 
 Les identifiants (tconst, nconst) servent uniquement aux jointures et ne sont pas exportés.
 
-Usage : python jointure_complete.py
+Structure attendue du projet :
+    projet_imdb/
+    ├── tsv/       fichiers IMDb bruts (title.akas.tsv, title.basics.tsv, ...)  <- entrée
+    ├── output/    imdb_jointure_complete.csv                                   <- sortie
+    │   └── temp_duckdb/   fichiers temporaires (supprimés à la fin)
+    ├── data/
+    └── Notebook/
+
+Usage (depuis la racine du projet ou depuis Notebook/) : python jointure_complete.py
 """
 import time
 from pathlib import Path
 
 import duckdb
 
-DOSSIER = Path(__file__).parent
-SORTIE = DOSSIER / "imdb_jointure_complete.csv"
+
+
+def trouver_racine():
+    """Remonte depuis le dossier du script (ou du notebook) jusqu'au dossier qui contient tsv/."""
+    depart = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd()
+    for dossier in [depart, *depart.parents]:
+        if (dossier / "tsv").is_dir():
+            return dossier
+    raise FileNotFoundError(f"Dossier tsv/ introuvable au-dessus de {depart}")
+
+
+RACINE = trouver_racine()
+DOSSIER_TSV = RACINE / "tsv"
+DOSSIER_OUTPUT = RACINE / "output"
+DOSSIER_TEMP = DOSSIER_OUTPUT / "temp_duckdb"
+SORTIE = DOSSIER_OUTPUT / "imdb_jointure_complete.csv"
 SEP = " | "  # séparateur à l'intérieur des cellules multi-valeurs
 NB_PAQUETS = 16  # les regroupements sont faits par paquets de titres pour tenir en mémoire
 
@@ -27,7 +49,7 @@ OPTIONS = "delim='\t', quote='', escape='', header=true, nullstr='\\N', all_varc
 
 
 def table(nom):
-    return f"read_csv('{DOSSIER / (nom + '.tsv')}', {OPTIONS})"
+    return f"read_csv('{DOSSIER_TSV / (nom + '.tsv')}', {OPTIONS})"
 
 
 def par_paquets(requete, cle):
@@ -97,14 +119,15 @@ WHERE {{paquet}}
 if __name__ == "__main__":
     debut = time.time()
     # Base DuckDB temporaire sur disque : les tables intermédiaires n'ont pas à tenir en RAM
-    base = DOSSIER / "_jointure_tmp.duckdb"
+    DOSSIER_TEMP.mkdir(parents=True, exist_ok=True)
+    base = DOSSIER_TEMP / "jointure_tmp.duckdb"
     base.unlink(missing_ok=True)
     con = duckdb.connect(str(base))
     con.execute("SET memory_limit = '12GB'")
     con.execute("SET threads = 4")
     con.execute("SET max_temp_directory_size = '100GB'")
     con.execute("SET preserve_insertion_order = false")
-    con.execute(f"SET temp_directory = '{DOSSIER / '_jointure_tmp_spill'}'")
+    con.execute(f"SET temp_directory = '{DOSSIER_TEMP / 'spill'}'")
 
     for nom, requetes in ETAPES.items():
         t = time.time()

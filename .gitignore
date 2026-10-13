@@ -1,0 +1,22 @@
+# Données IMDb brutes (TSV, ~10 Go)
+Data/
+
+# Dataset produit par la jointure (CSV ~6 Go) et fichiers temporaires DuckDB
+output/
+
+# Fichiers de données, où qu'ils soient
+*.tsv
+*.csv
+*.parquet
+*.duckdb
+*.duckdb.wal
+
+# Python / Jupyter
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# macOS
+.DS_Store
